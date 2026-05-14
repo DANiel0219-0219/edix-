@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>名刺トラッカー — Business Card Tracker</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #ffffff;
+    --bg-secondary: #f5f5f3;
+    --bg-danger: #fff0f0;
+    --text: #1a1a18;
+    --text-secondary: #6b6b66;
+    --text-tertiary: #a0a09a;
+    --text-danger: #a32d2d;
+    --border: rgba(0,0,0,0.12);
+    --border-secondary: rgba(0,0,0,0.22);
+    --border-primary: rgba(0,0,0,0.35);
+    --border-danger: #f09595;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --font: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic UI', 'Segoe UI', sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1e1e1c;
+      --bg-secondary: #2a2a28;
+      --bg-danger: #2d1f1f;
+      --text: #f0f0ec;
+      --text-secondary: #a0a09a;
+      --text-tertiary: #6b6b66;
+      --text-danger: #f09595;
+      --border: rgba(255,255,255,0.10);
+      --border-secondary: rgba(255,255,255,0.18);
+      --border-primary: rgba(255,255,255,0.30);
+      --border-danger: #a32d2d;
+    }
+  }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg-secondary);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 2rem 1rem;
+  }
+
+  .container {
+    max-width: 760px;
+    margin: 0 auto;
+  }
+
+  .header { margin-bottom: 1.5rem; }
+  .header h1 { font-size: 22px; font-weight: 500; margin-bottom: 4px; }
+  .header p { font-size: 13px; color: var(--text-secondary); }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 1.5rem;
+  }
+  .stat {
+    background: var(--bg);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 12px 14px;
+  }
+  .stat-label { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+  .stat-value { font-size: 22px; font-weight: 500; }
+
+  .person-section { margin-bottom: 1.25rem; }
+  .person-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px;
+    background: var(--bg);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-md);
+    margin-bottom: 8px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .person-header:hover { background: var(--bg-secondary); }
+  .person-avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 500; flex-shrink: 0;
+  }
+  .person-info { flex: 1; }
+  .person-name { font-size: 14px; font-weight: 500; }
+  .person-count { font-size: 12px; color: var(--text-secondary); }
+  .person-badge { font-size: 12px; padding: 3px 10px; border-radius: 99px; white-space: nowrap; }
+  .chevron { font-size: 18px; color: var(--text-tertiary); transition: transform 0.15s; }
+  .chevron.open { transform: rotate(180deg); }
+
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 6px;
+    padding: 4px 2px 8px;
+  }
+  .card-slot {
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 8px 6px;
+    cursor: pointer;
+    min-height: 64px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 3px;
+    background: var(--bg);
+    transition: background 0.1s, border-color 0.1s;
+  }
+  .card-slot:hover { background: var(--bg-secondary); }
+  .card-slot.assigned { background: var(--bg-secondary); border-color: var(--border-secondary); }
+  .card-num { font-size: 11px; color: var(--text-tertiary); }
+  .card-company { font-size: 10px; color: var(--text-secondary); text-align: center; word-break: break-word; line-height: 1.3; }
+  .card-plus { font-size: 20px; color: var(--text-tertiary); line-height: 1; }
+  .card-slot.assigned .card-plus { display: none; }
+
+  /* Modal */
+  .modal-bg {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.45);
+    align-items: center; justify-content: center;
+    padding: 1rem; z-index: 100;
+  }
+  .modal-bg.open { display: flex; }
+  .modal {
+    background: var(--bg);
+    border: 0.5px solid var(--border-secondary);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    width: 100%; max-width: 360px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+  }
+  .modal h3 { font-size: 15px; font-weight: 500; margin-bottom: 4px; }
+  .modal-sub { font-size: 12px; color: var(--text-secondary); margin-bottom: 1rem; }
+  .modal input {
+    width: 100%; margin-bottom: 10px;
+    padding: 8px 10px; font-size: 14px;
+    border-radius: var(--radius-md);
+    border: 0.5px solid var(--border-secondary);
+    background: var(--bg-secondary);
+    color: var(--text);
+    font-family: var(--font);
+    outline: none;
+  }
+  .modal input:focus { border-color: var(--border-primary); }
+  .modal-btns { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+  .btn {
+    padding: 7px 16px;
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    border: 0.5px solid var(--border-secondary);
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    font-family: var(--font);
+  }
+  .btn:hover { background: var(--bg-secondary); }
+  .btn.primary { background: var(--text); color: var(--bg); border-color: transparent; }
+  .btn.primary:hover { opacity: 0.85; }
+  .btn.danger { color: var(--text-danger); border-color: var(--border-danger); margin-right: auto; }
+  .btn.danger:hover { background: var(--bg-danger); }
+
+  @media (max-width: 500px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>名刺トラッカー — Business Card Tracker</h1>
+    <p>Track which contact received each numbered card. Click a card to assign it.</p>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-label">Total cards</div><div class="stat-value">40</div></div>
+    <div class="stat"><div class="stat-label">Handed out</div><div class="stat-value" id="assigned-val">0</div></div>
+    <div class="stat"><div class="stat-label">Remaining</div><div class="stat-value" id="remaining-val">40</div></div>
+    <div class="stat"><div class="stat-label">Progress</div><div class="stat-value" id="pct-val">0%</div></div>
+  </div>
+
+  <div id="persons-container"></div>
+</div>
+
+<div class="modal-bg" id="modal">
+  <div class="modal">
+    <h3 id="modal-title">Assign card</h3>
+    <p class="modal-sub" id="modal-subtitle"></p>
+    <input id="modal-input" type="text" placeholder="Company or person name..." maxlength="80" />
+    <div class="modal-btns">
+      <button class="btn danger" id="modal-clear" style="display:none">Clear</button>
+      <button class="btn" id="modal-cancel">Cancel</button>
+      <button class="btn primary" id="modal-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const PERSONS = [
+  { id: 'kashiwagi', name: '柏木',   count: 20, start: 101, avatarBg: '#E6F1FB', avatarColor: '#0C447C', badgeBg: '#B5D4F4', badgeColor: '#0C447C' },
+  { id: 'satoshi',   name: '智さん', count: 17, start: 121, avatarBg: '#E1F5EE', avatarColor: '#085041', badgeBg: '#9FE1CB', badgeColor: '#085041' },
+  { id: 'cho',       name: 'チョさん', count: 3, start: 138, avatarBg: '#FAECE7', avatarColor: '#712B13', badgeBg: '#F5C4B3', badgeColor: '#712B13' },
+];
+
+const KEY = 'biz_card_data_v2';
+let data = {};
+try { data = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch(e) {}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch(e) {} }
+
+let openSections = { kashiwagi: true, satoshi: true, cho: true };
+let editing = null;
+
+function render() {
+  const container = document.getElementById('persons-container');
+  container.innerHTML = '';
+  let totalAssigned = 0;
+
+  PERSONS.forEach(person => {
+    const assigned = Object.values(data).filter(d => d.person === person.id).length;
+    totalAssigned += assigned;
+    const isOpen = openSections[person.id];
+
+    const sec = document.createElement('div');
+    sec.className = 'person-section';
+
+    const hdr = document.createElement('div');
+    hdr.className = 'person-header';
+    hdr.innerHTML = `
+      <div class="person-avatar" style="background:${person.avatarBg};color:${person.avatarColor}">${person.name.charAt(0)}</div>
+      <div class="person-info">
+        <div class="person-name">${person.name}</div>
+        <div class="person-count">${assigned} handed out · ${person.count - assigned} remaining</div>
+      </div>
+      <span class="person-badge" style="background:${person.badgeBg};color:${person.badgeColor}">${person.count} cards</span>
+      <span class="chevron ${isOpen ? 'open' : ''}">&#8964;</span>
+    `;
+    hdr.addEventListener('click', () => { openSections[person.id] = !openSections[person.id]; render(); });
+    sec.appendChild(hdr);
+
+    if (isOpen) {
+      const grid = document.createElement('div');
+      grid.className = 'cards-grid';
+      for (let i = 0; i < person.count; i++) {
+        const num = person.start + i;
+        const id = 'card-' + num;
+        const entry = data[id];
+        const slot = document.createElement('div');
+        slot.className = 'card-slot' + (entry ? ' assigned' : '');
+        slot.innerHTML = entry
+          ? `<span class="card-num">#${num}</span><span class="card-company">${entry.company}</span>`
+          : `<span class="card-plus">+</span><span class="card-num">#${num}</span>`;
+        slot.addEventListener('click', () => openModal(id, num, person, entry));
+        grid.appendChild(slot);
+      }
+      sec.appendChild(grid);
+    }
+    container.appendChild(sec);
+  });
+
+  document.getElementById('assigned-val').textContent = totalAssigned;
+  document.getElementById('remaining-val').textContent = 40 - totalAssigned;
+  document.getElementById('pct-val').textContent = Math.round(totalAssigned / 40 * 100) + '%';
+}
+
+function openModal(cardId, cardNum, person, existing) {
+  editing = { cardId, personId: person.id };
+  document.getElementById('modal-title').textContent = (existing ? 'Edit' : 'Assign') + ' card #' + cardNum;
+  document.getElementById('modal-subtitle').textContent = person.name + '\u2019s card \u2014 who did you give this to?';
+  document.getElementById('modal-input').value = existing ? existing.company : '';
+  document.getElementById('modal-clear').style.display = existing ? 'inline-block' : 'none';
+  document.getElementById('modal').classList.add('open');
+  setTimeout(() => document.getElementById('modal-input').focus(), 50);
+}
+
+function closeModal() { document.getElementById('modal').classList.remove('open'); editing = null; }
+
+document.getElementById('modal-save').addEventListener('click', () => {
+  const val = document.getElementById('modal-input').value.trim();
+  if (!val || !editing) { closeModal(); return; }
+  data[editing.cardId] = { company: val, person: editing.personId };
+  save(); closeModal(); render();
+});
+document.getElementById('modal-cancel').addEventListener('click', closeModal);
+document.getElementById('modal-clear').addEventListener('click', () => {
+  if (editing) { delete data[editing.cardId]; save(); closeModal(); render(); }
+});
+document.getElementById('modal-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('modal-save').click();
+  if (e.key === 'Escape') closeModal();
+});
+document.getElementById('modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal')) closeModal();
+});
+
+render();
+</script>
+</body>
+</html>
